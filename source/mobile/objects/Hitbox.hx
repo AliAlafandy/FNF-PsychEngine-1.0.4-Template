@@ -2,13 +2,11 @@ package mobile.objects;
 
 import openfl.display.BitmapData;
 import openfl.display.Shape;
-import openfl.filters.GlowFilter;
 import flixel.graphics.FlxGraphic;
 import flixel.util.FlxSignal.FlxTypedSignal;
 import flixel.util.FlxColor;
 import flixel.tweens.FlxEase;
 import flixel.tweens.FlxTween;
-import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.FlxSprite;
 import openfl.geom.Matrix;
 
@@ -29,10 +27,10 @@ class Hitbox extends MobileInputManager implements IMobileControls
 	public var onButtonUp:FlxTypedSignal<TouchButton->Void> = new FlxTypedSignal<TouchButton->Void>();
 
 	var storedButtonsIDs:Map<String, Array<MobileInputID>> = new Map<String, Array<MobileInputID>>();
-	var rippleLayer:FlxTypedGroup<FlxSprite> = new FlxTypedGroup<FlxSprite>();
 	var hintTweens:Map<String, FlxTween> = new Map<String, FlxTween>();
 	var hintLaneTweens:Map<String, FlxTween> = new Map<String, FlxTween>();
 	var hintScaleTweens:Map<String, FlxTween> = new Map<String, FlxTween>();
+	var hintFlashTweens:Map<String, FlxTween> = new Map<String, FlxTween>();
 
 	public function new(?extraMode:ExtraActions = NONE)
 	{
@@ -44,8 +42,6 @@ class Hitbox extends MobileInputManager implements IMobileControls
 			if (Std.isOfType(field, TouchButton))
 				storedButtonsIDs.set(button, Reflect.getProperty(field, 'IDs'));
 		}
-
-		add(rippleLayer);
 
 		switch (extraMode)
 		{
@@ -100,6 +96,7 @@ class Hitbox extends MobileInputManager implements IMobileControls
 		hintTweens.clear();
 		hintLaneTweens.clear();
 		hintScaleTweens.clear();
+		hintFlashTweens.clear();
 	}
 
 	private function createHint(X:Float, Y:Float, Width:Int, Height:Int, Color:Int = 0xFFFFFF):TouchButton
@@ -118,8 +115,6 @@ class Hitbox extends MobileInputManager implements IMobileControls
 			hint.label.offset.y -= (hint.height - hint.label.height) / 2;
 		else
 			hint.label.offset.y += (hint.height - hint.label.height) / 2;
-
-		hint.filters = [new GlowFilter(Color, 0, 0, 0, 2, 1, true)];
 
 		if (ClientPrefs.data.hitboxType != "Hidden")
 		{
@@ -160,6 +155,7 @@ class Hitbox extends MobileInputManager implements IMobileControls
 		cancelTween(hintTweens, key);
 		cancelTween(hintLaneTweens, key);
 		cancelTween(hintScaleTweens, key);
+		cancelTween(hintFlashTweens, key);
 
 		var targetAlpha = pressed ? ClientPrefs.data.controlsAlpha : 0.00001;
 		var labelAlpha = pressed ? 0.00001 : ClientPrefs.data.controlsAlpha;
@@ -181,14 +177,13 @@ class Hitbox extends MobileInputManager implements IMobileControls
 			onComplete: (twn:FlxTween) -> hintScaleTweens.remove(key)
 		}));
 
-		var glow:GlowFilter = cast hint.filters[0];
-		FlxTween.num(glow.strength, pressed ? 3 : 0, 0.15, {
-			onUpdate: (twn:FlxTween) -> {
-				glow.strength = twn.value;
-				glow.blurX = glow.blurY = twn.value * 4;
-				hint.filters = [glow];
-			}
-		});
+		hint.color = pressed ? FlxColor.WHITE : color;
+		if (pressed)
+		{
+			hintFlashTweens.set(key, FlxTween.color(hint, 0.2, FlxColor.WHITE, color, {
+				onComplete: (twn:FlxTween) -> hintFlashTweens.remove(key)
+			}));
+		}
 	}
 
 	function cancelTween(map:Map<String, FlxTween>, key:String):Void
@@ -200,24 +195,39 @@ class Hitbox extends MobileInputManager implements IMobileControls
 
 	function spawnRipple(hint:TouchButton, color:Int):Void
 	{
+		var size:Int = Std.int(hint.width * 0.4);
 		var ripple = new FlxSprite();
-		ripple.makeGraphic(Std.int(hint.width * 0.4), Std.int(hint.width * 0.4), FlxColor.TRANSPARENT, true);
-		ripple.drawCircle(-1, -1, ripple.width / 2, color);
+		ripple.loadGraphic(createRippleGraphic(size, color));
 		ripple.x = hint.x + hint.width / 2 - ripple.width / 2;
 		ripple.y = hint.y + hint.height / 2 - ripple.height / 2;
 		ripple.alpha = 0.5;
 		ripple.scale.set(0.3, 0.3);
 		ripple.scrollFactor.set();
-		rippleLayer.add(ripple);
+		ripple.cameras = hint.cameras;
+
+		FlxG.state.add(ripple);
 
 		FlxTween.tween(ripple.scale, {x: 1.6, y: 1.6}, 0.4, {ease: FlxEase.quadOut});
 		FlxTween.tween(ripple, {alpha: 0}, 0.4, {
 			ease: FlxEase.quadOut,
 			onComplete: (twn:FlxTween) -> {
-				rippleLayer.remove(ripple, true);
+				FlxG.state.remove(ripple, true);
 				ripple.destroy();
 			}
 		});
+	}
+
+	function createRippleGraphic(size:Int, color:Int):FlxGraphic
+	{
+		var shape:Shape = new Shape();
+		shape.graphics.lineStyle(4, color, 1);
+		shape.graphics.drawCircle(size / 2, size / 2, size / 2 - 2);
+		shape.graphics.endFill();
+
+		var bitmap:BitmapData = new BitmapData(size, size, true, 0);
+		bitmap.draw(shape);
+
+		return FlxG.bitmap.add(bitmap);
 	}
 
 	function createHintGraphic(Width:Int, Height:Int, Color:Int = 0xFFFFFF, ?isLane:Bool = false):FlxGraphic
