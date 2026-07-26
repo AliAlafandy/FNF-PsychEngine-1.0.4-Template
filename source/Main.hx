@@ -59,6 +59,14 @@ class Main extends Sprite
 		#end
 	}
 
+	#if mobile
+	public static function refreshScaleMode():Void
+	{
+		if (Std.isOfType(FlxG.scaleMode, MobileScaleMode))
+			FlxG.scaleMode = new MobileScaleMode();
+	}
+	#end
+
 	public function new()
 	{
 		super();
@@ -195,8 +203,10 @@ class Main extends Sprite
 
 		// shader coords fix
 		FlxG.signals.gameResized.add(function (w, h) {
+			var scale:Float = (FlxG.scaleMode != null && FlxG.scaleMode.gameSize.x > 0) ? (FlxG.scaleMode.gameSize.x / FlxG.width) : Math.min(w / FlxG.width, h / FlxG.height);
+
 			if(fpsVar != null)
-				fpsVar.positionFPS(10, 3, Math.min(w / FlxG.width, h / FlxG.height));
+				fpsVar.positionFPS(10, 3, scale);
 		     if (FlxG.cameras != null) {
 			   for (cam in FlxG.cameras.list) {
 				if (cam != null && cam.filters != null)
