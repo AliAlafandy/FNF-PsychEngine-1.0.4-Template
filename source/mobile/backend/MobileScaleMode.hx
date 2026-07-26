@@ -24,28 +24,35 @@ package mobile.backend;
 
 import flixel.system.scaleModes.BaseScaleMode;
 
-/**
- * ...
- * @author: Karim Akra
- */
 class MobileScaleMode extends BaseScaleMode
 {
 	public static var allowWideScreen(default, set):Bool = true;
 
 	override function updateGameSize(Width:Int, Height:Int):Void
 	{
+		var ratio:Float = FlxG.width / FlxG.height;
+		var realRatio:Float = Width / Height;
+
 		if (ClientPrefs.data.wideScreen && allowWideScreen)
 		{
-			super.updateGameSize(Width, Height);
+			var fitByHeight:Bool = realRatio > ratio;
+
+			if (fitByHeight)
+			{
+				gameSize.y = Height;
+				gameSize.x = Math.ceil(gameSize.y * ratio);
+			}
+			else
+			{
+				gameSize.x = Width;
+				gameSize.y = Math.ceil(gameSize.x / ratio);
+			}
 		}
 		else
 		{
-			var ratio:Float = FlxG.width / FlxG.height;
-			var realRatio:Float = Width / Height;
+			var fitByWidth:Bool = realRatio < ratio;
 
-			var scaleY:Bool = realRatio < ratio;
-
-			if (scaleY)
+			if (fitByWidth)
 			{
 				gameSize.x = Width;
 				gameSize.y = Math.floor(gameSize.x / ratio);
@@ -61,7 +68,10 @@ class MobileScaleMode extends BaseScaleMode
 	override function updateGamePosition():Void
 	{
 		if (ClientPrefs.data.wideScreen && allowWideScreen)
-			FlxG.game.x = FlxG.game.y = 0;
+		{
+			FlxG.game.x = Math.floor((FlxG.stage.stageWidth - gameSize.x) * 0.5);
+			FlxG.game.y = Math.floor((FlxG.stage.stageHeight - gameSize.y) * 0.5);
+		}
 		else
 			super.updateGamePosition();
 	}
