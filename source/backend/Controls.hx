@@ -78,7 +78,7 @@ class Controls
 	public var gamepadBinds:Map<String, Array<FlxGamepadInputID>>;
 	public var mobileBinds:Map<String, Array<MobileInputID>>;
 
-	public var controllerMode(default, null):Bool = false;
+	public var controllerMode(default, set):Bool = false;
 	public var onControllerModeChanged:FlxTypedSignal<Bool->Void> = new FlxTypedSignal();
 
 	public function justPressed(key:String):Bool
@@ -127,7 +127,7 @@ class Controls
 	{
 		var result:Bool = checkKeyboard(keyboardBinds.get(key), state);
 		if (result)
-			setControllerMode(false);
+			controllerMode = false;
 
 		return result
 			|| checkGamepad(gamepadBinds.get(key), state)
@@ -164,7 +164,7 @@ class Controls
 
 			if (active)
 			{
-				setControllerMode(true);
+				controllerMode = true;
 				return true;
 			}
 		}
@@ -199,13 +199,13 @@ class Controls
 		}
 	}
 
-	private function setControllerMode(value:Bool):Void
+	private function set_controllerMode(value:Bool):Bool
 	{
 		if (controllerMode != value)
-		{
-			controllerMode = value;
 			onControllerModeChanged.dispatch(value);
-		}
+
+		controllerMode = value;
+		return value;
 	}
 
 	public var isInSubstate:Bool = false;
