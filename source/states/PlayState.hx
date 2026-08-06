@@ -662,8 +662,10 @@ class PlayState extends MusicBeatState
 		splash.alpha = 0.000001; //cant make it invisible or it won't allow precaching
 
 		#if mobile
+		#if !android
 		addTouchPad('NONE', 'P');
 		addTouchPadCamera();
+		#end
 		#end
 
 		super.create();
@@ -1736,13 +1738,27 @@ class PlayState extends MusicBeatState
 			botplayTxt.alpha = 1 - Math.sin((Math.PI * botplaySine) / 180);
 		}
 
-		if (controls.PAUSE #if mobile || touchPad.buttonP.justPressed #end && startedCountdown && canPause)
+		#if mobile
+		if (controls.PAUSE
+			#if !android
+			|| touchPad.buttonP.justPressed
+			#end
+			&& startedCountdown && canPause)
 		{
 			var ret:Dynamic = callOnScripts('onPause', null, true);
 			if(ret != LuaUtils.Function_Stop) {
 				openPauseMenu();
 			}
 		}
+		#else
+		if (controls.PAUSE && startedCountdown && canPause)
+		{
+			var ret:Dynamic = callOnScripts('onPause', null, true);
+			if(ret != LuaUtils.Function_Stop) {
+				openPauseMenu();
+			}
+		}
+		#end
 
 		if(!endingSong && !inCutscene && allowDebugKeys)
 		{
