@@ -78,7 +78,7 @@ class AudioManager
 		#end
 	}
 
-	private static function getALC():Null<ALC>
+	private static function getALC():Dynamic
 	{
 		#if !lime_doc_gen
 		return (context != null && context.type == OPENAL) ? context.openal : null;
