@@ -1,5 +1,3 @@
-// shadowing this class because we're unable to apply the config files to mobile during __init__
-
 package lime.media;
 
 import haxe.Timer;
@@ -22,69 +20,113 @@ class AudioManager
 {
 	public static var context:AudioContext;
 
-	public static function init(context:AudioContext = null)
+	private static var cleanupTimer:Timer;
+
+	public static function init(context:AudioContext = null):Void
 	{
-		if (AudioManager.context == null)
+		if (AudioManager.context != null)
+			return;
+
+		if (context == null)
 		{
-			if (context == null)
-			{
-				AudioManager.context = new AudioContext();
-				context = AudioManager.context;
-
-				#if !lime_doc_gen
-				if (context.type == OPENAL)
-				{
-					var alc = context.openal;
-
-					#if (lime_openal && !ios)
-					ALSoftConfig.init();
-					#end
-					var device = alc.openDevice();
-					var ctx = alc.createContext(device);
-					alc.makeContextCurrent(ctx);
-					alc.processContext(ctx);
-				}
-				#end
-			}
-
-			AudioManager.context = context;
-
-			#if (lime_cffi && !macro && lime_openal && (ios || tvos || mac))
-			var timer = new Timer(100);
-			timer.run = function()
-			{
-				NativeCFFI.lime_al_cleanup();
-			};
-			#end
+			context = new AudioContext();
+			setupOpenAL(context);
 		}
+
+		AudioManager.context = context;
+		startCleanupTimer();
 	}
 
-	public static function resume():Void
+	private static function setupOpenAL(context:AudioContext):Void
 	{
 		#if !lime_doc_gen
-		if (context != null && context.type == OPENAL)
-		{
-			var alc = context.openal;
-			var currentContext = alc.getCurrentContext();
+		if (context.type != OPENAL)
+			return;
 
-			if (currentContext != null)
-			{
-				var device = alc.getContextsDevice(currentContext);
-				alc.resumeDevice(device);
-				alc.processContext(currentContext);
-			}
+		var alc = context.openal;
+
+		#if (lime_openal && !ios)
+		ALSoftConfig.init();
+		#end
+
+		var device = alc.openDevice();
+		var ctx = alc.createContext(device);
+		alc.makeContextCurrent(ctx);
+		alc.processContext(ctx);
+		#end
+	}
+
+	private static function startCleanupTimer():Void
+	{
+		#if (lime_cffi && !macro && lime_openal && (ios || tvos || mac))
+		cleanupTimer = new Timer(100);
+		cleanupTimer.run = function()
+		{
+			NativeCFFI.lime_al_cleanup();
+		};
+		#end
+	}
+
+	private static function stopCleanupTimer():Void
+	{
+		#if (lime_cffi && !macro && lime_openal && (ios || tvos || mac))
+		if (cleanupTimer != null)
+		{
+			cleanupTimer.stop();
+			cleanupTimer = null;
 		}
 		#end
 	}
 
-	public static function shutdown():Void
+	private static function getALC():Null<ALC>
 	{
 		#if !lime_doc_gen
-		if (context != null && context.type == OPENAL)
-		{
-			var alc = context.openal;
-			var currentContext = alc.getCurrentContext();
+		return (context != null && context.type == OPENAL) ? context.openal : null;
+		#else
+		return null;
+		#end
+	}
 
+	public static function resume():Void
+	{
+		var alc = getALC();
+		if (alc == null)
+			return;
+
+		var currentContext = alc.getCurrentContext();
+		if (currentContext == null)
+			return;
+
+		var device = alc.getContextsDevice(currentContext);
+		alc.resumeDevice(device);
+		alc.processContext(currentContext);
+	}
+
+	public static function suspend():Void
+	{
+		var alc = getALC();
+		if (alc == null)
+			return;
+
+		var currentContext = alc.getCurrentContext();
+		if (currentContext == null)
+			return;
+
+		alc.suspendContext(currentContext);
+
+		var device = alc.getContextsDevice(currentContext);
+		if (device != null)
+			alc.pauseDevice(device);
+	}
+
+	public static function shutdown():Void
+	{
+		stopCleanupTimer();
+
+		var alc = getALC();
+		if (alc != null)
+		{
+			var currentContext = alc.getCurrentContext();
 			if (currentContext != null)
 			{
 				var device = alc.getContextsDevice(currentContext);
@@ -92,35 +134,10 @@ class AudioManager
 				alc.destroyContext(currentContext);
 
 				if (device != null)
-				{
 					alc.closeDevice(device);
-				}
 			}
 		}
-		#end
 
 		context = null;
-	}
-
-	public static function suspend():Void
-	{
-		#if !lime_doc_gen
-		if (context != null && context.type == OPENAL)
-		{
-			var alc = context.openal;
-			var currentContext = alc.getCurrentContext();
-
-			if (currentContext != null)
-			{
-				alc.suspendContext(currentContext);
-				var device = alc.getContextsDevice(currentContext);
-
-				if (device != null)
-				{
-					alc.pauseDevice(device);
-				}
-			}
-		}
-		#end
 	}
 }
